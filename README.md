@@ -2,6 +2,84 @@
 
 Dashboard untuk monitoring dan kontrol sistem stabilizer bola menggunakan ESP32 dan sensor IMU (MPU6050).
 
+## 📁 Project Structure
+
+```
+Stabilizer/
+├── main.py                   # ✨ Application entry point
+├── models/                   # ✨ Data models
+│   ├── __init__.py
+│   ├── imu_data.py          # IMU data structure
+│   ├── connection.py        # Connection interfaces
+│   ├── data_processor.py    # Data parsing & simulation
+│   └── data_logger.py       # CSV logging
+├── views/                    # ✨ UI components
+│   ├── __init__.py
+│   ├── plot_widget.py       # Matplotlib plots
+│   └── main_window.py       # Main dashboard window
+├── controllers/              # ✨ Business logic
+│   ├── __init__.py
+│   └── data_manager.py      # Data orchestration
+├── dashboard.py              # Original dashboard (legacy)
+├── imu_simulator.py          # IMU data simulator
+├── requirements.txt          # Python dependencies
+├── README.md                 # This file
+├── WIFI_SETUP.md            # WiFi setup guide
+├── TROUBLESHOOTING.md       # Troubleshooting guide
+└── esp_firmware/            # ESP32 firmware
+    └── src/
+        └── main.cpp         # ESP32 code
+```
+
+## 🆕 What's New - MVC Architecture
+
+Dashboard telah di-refactor menggunakan **Model-View-Controller (MVC)** pattern dengan struktur file yang proper!
+
+### Key Improvements:
+- ✅ **MVC Architecture** - Clean separation of concerns
+- ✅ **Modular Files** - Each class in its own file
+- ✅ **Python Naming Convention** - lowercase_with_underscores
+- ✅ **Type Safety** - Using dataclasses and type hints
+- ✅ **Abstract Interfaces** - Easy to add new connection types
+- ✅ **Better Testing** - Each component can be tested independently
+- ✅ **Professional Code** - Follows SOLID principles
+
+### Architecture Overview:
+
+**Models** (`models/`):
+- `imu_data.py` - Data structure untuk IMU readings
+- `connection.py` - Abstract interface dan implementasi (Serial, WiFi)
+- `data_processor.py` - Parser dan simulator
+- `data_logger.py` - CSV logging functionality
+
+**Views** (`views/`):
+- `plot_widget.py` - Matplotlib plotting widget
+- `main_window.py` - PyQt5 main window UI
+
+**Controllers** (`controllers/`):
+- `data_manager.py` - Orchestrates data flow dan business logic
+
+**Entry Point**:
+- `main.py` - Run the application
+
+## 🚀 Quick Start
+
+### Run Dashboard
+```bash
+python main.py
+```
+
+### Old Version (Legacy)
+```bash
+python dashboard.py
+```
+
+---
+
+## Ball Stabilizer Dashboard
+
+Dashboard untuk monitoring dan kontrol sistem stabilizer bola menggunakan ESP32 dan sensor IMU (MPU6050).
+
 ## 🔌 Mode Koneksi
 
 Dashboard mendukung 2 mode koneksi:
