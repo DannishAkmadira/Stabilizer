@@ -2,7 +2,7 @@
 
 from typing import Optional, Callable
 from models import (
-    IMUData, IConnection, SerialConnection, WiFiConnection,
+    IMUData, IConnection, SerialConnection, WiFiConnection, MQTTConnection,
     DataParser, DataSimulator, DataLogger
 )
 
@@ -50,6 +50,26 @@ class DataManager:
         """
         self.disconnect()
         self.connection = WiFiConnection(host, port)
+        self.is_simulation = False
+        return self.connection.connect()
+    
+    def connect_mqtt(self, broker: str, port: int = 1883,
+                     topic_data: str = "gimbal/stabilizer",
+                     topic_cmd: str = "gimbal/command") -> bool:
+        """
+        Koneksi ke MQTT broker.
+        
+        Args:
+            broker: MQTT broker address (e.g., "broker.hivemq.com")
+            port: MQTT port (default 1883)
+            topic_data: Topic untuk menerima data
+            topic_cmd: Topic untuk mengirim command
+            
+        Returns:
+            True jika berhasil connect
+        """
+        self.disconnect()
+        self.connection = MQTTConnection(broker, port, topic_data, topic_cmd)
         self.is_simulation = False
         return self.connection.connect()
     
@@ -115,3 +135,22 @@ class DataManager:
             self.data_callback(data)
         
         return data
+    
+    def send_pid_values(self, kp: float, ki: float, kd: float) -> bool:
+        """
+        Kirim PID values ke ESP32.
+        
+        Args:
+            kp: Proportional gain
+            ki: Integral gain
+            kd: Derivative gain
+            
+        Returns:
+            True jika berhasil mengirim
+        """
+        if not self.connection or not self.connection.is_connected():
+            return False
+        
+        # Format: PID:Kp,Ki,Kd
+        command = f"PID:{kp},{ki},{kd}"
+        return self.connection.send_command(command)

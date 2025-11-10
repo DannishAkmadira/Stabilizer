@@ -2,182 +2,150 @@
 
 Dashboard untuk monitoring dan kontrol sistem stabilizer bola menggunakan ESP32 dan sensor IMU (MPU6050).
 
-## 📁 Project Structure
+## Authors
+- Muhammad Alif Iqbal
+- Dannish Rafi Akmadira
+
+## Project Structure
 
 ```
 Stabilizer/
-├── main.py                   # ✨ Application entry point
-├── models/                   # ✨ Data models
-│   ├── __init__.py
+├── main.py                   # Application entry point
+├── models/                   # Data models
 │   ├── imu_data.py          # IMU data structure
-│   ├── connection.py        # Connection interfaces
+│   ├── connection.py        # Connection interfaces (Serial, MQTT)
 │   ├── data_processor.py    # Data parsing & simulation
 │   └── data_logger.py       # CSV logging
-├── views/                    # ✨ UI components
-│   ├── __init__.py
+├── views/                    # UI components
 │   ├── plot_widget.py       # Matplotlib plots
 │   └── main_window.py       # Main dashboard window
-├── controllers/              # ✨ Business logic
-│   ├── __init__.py
+├── controllers/             
 │   └── data_manager.py      # Data orchestration
-├── dashboard.py              # Original dashboard (legacy)
-├── imu_simulator.py          # IMU data simulator
 ├── requirements.txt          # Python dependencies
-├── README.md                 # This file
-├── WIFI_SETUP.md            # WiFi setup guide
-├── TROUBLESHOOTING.md       # Troubleshooting guide
 └── esp_firmware/            # ESP32 firmware
     └── src/
         └── main.cpp         # ESP32 code
 ```
 
-## 🆕 What's New - MVC Architecture
+## Quick Start
 
-Dashboard telah di-refactor menggunakan **Model-View-Controller (MVC)** pattern dengan struktur file yang proper!
-
-### Key Improvements:
-- ✅ **MVC Architecture** - Clean separation of concerns
-- ✅ **Modular Files** - Each class in its own file
-- ✅ **Python Naming Convention** - lowercase_with_underscores
-- ✅ **Type Safety** - Using dataclasses and type hints
-- ✅ **Abstract Interfaces** - Easy to add new connection types
-- ✅ **Better Testing** - Each component can be tested independently
-- ✅ **Professional Code** - Follows SOLID principles
-
-### Architecture Overview:
-
-**Models** (`models/`):
-- `imu_data.py` - Data structure untuk IMU readings
-- `connection.py` - Abstract interface dan implementasi (Serial, WiFi)
-- `data_processor.py` - Parser dan simulator
-- `data_logger.py` - CSV logging functionality
-
-**Views** (`views/`):
-- `plot_widget.py` - Matplotlib plotting widget
-- `main_window.py` - PyQt5 main window UI
-
-**Controllers** (`controllers/`):
-- `data_manager.py` - Orchestrates data flow dan business logic
-
-**Entry Point**:
-- `main.py` - Run the application
-
-## 🚀 Quick Start
-
-### Run Dashboard
 ```bash
 python main.py
 ```
 
-### Old Version (Legacy)
-```bash
-python dashboard.py
-```
-
----
-
-## Ball Stabilizer Dashboard
-
-Dashboard untuk monitoring dan kontrol sistem stabilizer bola menggunakan ESP32 dan sensor IMU (MPU6050).
-
-## 🔌 Mode Koneksi
+## Mode Koneksi
 
 Dashboard mendukung 2 mode koneksi:
 
-### 1. **Serial (USB)**
-Koneksi langsung melalui kabel USB ke ESP32
+### Serial (USB)
+Koneksi langsung melalui kabel USB ke ESP32.
 - Port: COM3, COM4, dll (tergantung sistem)
 - Baud rate: 115200
 
-### 2. **WiFi (TCP)**
-Koneksi wireless melalui jaringan WiFi
-- Port: 8888
-- IP Address: Sesuai IP ESP32 yang terhubung ke WiFi
+### MQTT (WiFi)
+Koneksi wireless melalui MQTT broker.
+- Broker: broker.hivemq.com (atau gunakan broker lokal)
+- Port: 1883
+- Topics:
+  - Data: `gimbal/stabilizer`
+  - Command: `gimbal/command`
 
-## 📋 Cara Penggunaan
+## Cara Penggunaan
 
-### Setup ESP32 dengan WiFi
+### Setup ESP32
 
-1. **Upload firmware** ke ESP32 menggunakan PlatformIO
-2. Saat pertama kali dinyalakan, ESP32 akan membuat Access Point dengan nama **"GimbalAP"**
-3. Hubungkan laptop/HP ke WiFi **"GimbalAP"**
-4. Browser akan otomatis terbuka untuk konfigurasi WiFi (atau buka `192.168.4.1`)
-5. Pilih WiFi yang ingin dihubungkan dan masukkan password
-6. ESP32 akan restart dan terhubung ke WiFi tersebut
-7. Lihat IP Address ESP32 di Serial Monitor (contoh: `192.168.1.100`)
+1. Upload firmware ke ESP32 menggunakan PlatformIO
+2. ESP32 akan membuat Access Point "GimbalAP" saat pertama kali
+3. Hubungkan ke WiFi "GimbalAP"
+4. Browser akan terbuka untuk konfigurasi WiFi (atau buka 192.168.4.1)
+5. Pilih WiFi dan masukkan password
+6. ESP32 akan restart dan connect ke WiFi
 
-### Menjalankan Dashboard
+### Install Dependencies
 
-1. **Install dependencies**:
-   ```cmd
-   pip install -r requirements.txt
-   ```
-
-2. **Jalankan dashboard**:
-   ```cmd
-   python dashboard.py
-   ```
-
-### Koneksi Serial (USB)
-
-1. Pilih radio button **"Serial (USB)"**
-2. Pilih **COM Port** dari dropdown (contoh: COM3)
-3. Klik **"Connect"**
-4. Klik **"Start"** untuk mulai menerima data
-
-### Koneksi WiFi
-
-1. Pastikan laptop dan ESP32 terhubung ke **WiFi yang sama**
-2. Pilih radio button **"WiFi (TCP)"**
-3. Masukkan **IP Address ESP32** (lihat di Serial Monitor)
-4. Port default: **8888**
-5. Klik **"Connect"**
-6. Klik **"Start"** untuk mulai menerima data
-
-## 📊 Format Data
-
-ESP32 mengirim data dengan format:
-```
-DATA:roll,pitch,yaw,servo_pos
+```bash
+pip install -r requirements.txt
 ```
 
-Contoh:
+### Koneksi Serial
+
+1. Pilih "Serial (USB)"
+2. Pilih COM Port
+3. Klik "Connect"
+
+### Koneksi MQTT
+
+1. Pastikan ESP32 terhubung ke WiFi
+2. Pilih "MQTT (WiFi)"
+3. Masukkan MQTT Broker (default: broker.hivemq.com)
+4. Port: 1883
+5. Klik "Connect"
+
+## Format Data
+
+MQTT JSON format:
+```json
+{"r":5.23,"g":12.45,"s":95,"e":2.1,"i":0.5}
 ```
-DATA:0,10.52,0,95
+
+Fields:
+- r: Roll angle (degrees)
+- g: Gyro rate (deg/s)
+- s: Servo position (0-180)
+- e: PID error
+- i: PID integral term
+
+Serial format:
+```
+DATA:roll,gyro_rate,servo_pos
 ```
 
-- **Roll**: Sudut roll dalam derajat (untuk 1-axis = 0)
-- **Pitch**: Sudut pitch/angleY dalam derajat
-- **Yaw**: Sudut yaw dalam derajat (untuk 1-axis = 0)
-- **Servo Pos**: Posisi servo (45-135°)
+## Fitur
 
-## 🛠️ Fitur Dashboard
+- Real-time monitoring roll angle dan gyro rate
+- Grafik history data
+- PID control tuning dari aplikasi
+- Data logging ke CSV
+- Dual mode connection (Serial & MQTT)
 
-- ✅ Monitoring IMU data real-time (Roll, Pitch, Yaw)
-- ✅ Grafik history Roll & Pitch
-- ✅ PID Control parameter tuning
-- ✅ Data logging ke CSV file (`imu_log.csv`)
-- ✅ Manual control mode
-- ✅ System reset
-- ✅ Dual mode connection (Serial & WiFi)
+## PID Tuning
 
-## 📦 Dependencies
+1. Connect ke ESP32
+2. Masukkan nilai Kp, Ki, Kd di PID Control group
+3. Klik "Send PID to ESP32"
+4. Amati perubahan di grafik
+
+Default values: Kp=5.0, Ki=0.5, Kd=0.3
+
+Tips:
+- Kp: Tingkatkan untuk respons lebih cepat
+- Ki: Tingkatkan untuk melawan beban
+- Kd: Tingkatkan untuk damping lebih baik
+
+## Dependencies
 
 - PyQt5
 - matplotlib
 - pyserial
+- paho-mqtt
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
-### ESP32 tidak terhubung ke WiFi
-- Pastikan SSID dan password benar
-- Coba reset ESP32 dan ulangi konfigurasi WiFi
-- Gunakan Serial Monitor untuk melihat status koneksi
+### ESP32 tidak connect ke WiFi
+- Cek SSID dan password
+- Reset ESP32 dan ulangi konfigurasi
+- Lihat Serial Monitor untuk status
 
-### Dashboard tidak terima data WiFi
-- Pastikan laptop dan ESP32 di **WiFi yang sama**
-- Cek IP Address ESP32 di Serial Monitor
-- Cek firewall Windows tidak memblok port 8888
+### Dashboard tidak terima data
+- Pastikan ESP32 sudah connect ke WiFi
+- Cek MQTT broker address benar
+- Cek firewall tidak block port 1883
+- Install library: `pip install paho-mqtt`
+
+### MQTT connection failed
+- Cek internet connection
+- Coba broker lain: test.mosquitto.org
+- Untuk local broker gunakan IP lokal
 - Ping ESP32 dari CMD: `ping 192.168.1.100`
 
 ### Data tidak muncul

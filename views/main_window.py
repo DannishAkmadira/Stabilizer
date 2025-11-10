@@ -45,6 +45,10 @@ class BallStabilizerDashboard(QMainWindow):
         info_group = self.create_info_group()
         main_layout.addWidget(info_group)
         
+        # PID Control group
+        pid_group = self.create_pid_control_group()
+        main_layout.addWidget(pid_group)
+        
         # Plot widget
         self.plot_widget = PlotWidget(max_points=500)
         main_layout.addWidget(self.plot_widget)
@@ -63,18 +67,18 @@ class BallStabilizerDashboard(QMainWindow):
         self.connection_mode_group = QButtonGroup()
         
         self.serial_radio = QRadioButton("Serial (USB)")
-        self.wifi_radio = QRadioButton("WiFi (TCP)")
+        self.mqtt_radio = QRadioButton("MQTT (WiFi)")
         
         self.connection_mode_group.addButton(self.serial_radio, 0)
-        self.connection_mode_group.addButton(self.wifi_radio, 1)
+        self.connection_mode_group.addButton(self.mqtt_radio, 1)
         self.serial_radio.setChecked(True)
         
         # Connect radio buttons to slot
         self.serial_radio.toggled.connect(self.on_mode_changed)
-        self.wifi_radio.toggled.connect(self.on_mode_changed)
+        self.mqtt_radio.toggled.connect(self.on_mode_changed)
         
         mode_layout.addWidget(self.serial_radio)
-        mode_layout.addWidget(self.wifi_radio)
+        mode_layout.addWidget(self.mqtt_radio)
         mode_layout.addStretch()
         layout.addLayout(mode_layout)
         
@@ -92,22 +96,23 @@ class BallStabilizerDashboard(QMainWindow):
         self.serial_layout.addStretch()
         layout.addLayout(self.serial_layout)
         
-        # WiFi settings
-        self.wifi_layout = QHBoxLayout()
-        self.esp32_ip_label = QLabel("ESP32 IP:")
-        self.wifi_layout.addWidget(self.esp32_ip_label)
-        self.ip_input = QLineEdit()
-        self.ip_input.setPlaceholderText("192.168.4.1")
-        self.wifi_layout.addWidget(self.ip_input)
+        # MQTT settings
+        self.mqtt_layout = QHBoxLayout()
+        self.broker_label = QLabel("MQTT Broker:")
+        self.mqtt_layout.addWidget(self.broker_label)
+        self.broker_input = QLineEdit()
+        self.broker_input.setPlaceholderText("broker.hivemq.com")
+        self.broker_input.setText("broker.hivemq.com")
+        self.mqtt_layout.addWidget(self.broker_input)
         
-        self.port_label = QLabel("Port:")
-        self.wifi_layout.addWidget(self.port_label)
-        self.port_input = QLineEdit()
-        self.port_input.setText("8888")
-        self.port_input.setMaximumWidth(80)
-        self.wifi_layout.addWidget(self.port_input)
-        self.wifi_layout.addStretch()
-        layout.addLayout(self.wifi_layout)
+        self.mqtt_port_label = QLabel("Port:")
+        self.mqtt_layout.addWidget(self.mqtt_port_label)
+        self.mqtt_port_input = QLineEdit()
+        self.mqtt_port_input.setText("1883")
+        self.mqtt_port_input.setMaximumWidth(80)
+        self.mqtt_layout.addWidget(self.mqtt_port_input)
+        self.mqtt_layout.addStretch()
+        layout.addLayout(self.mqtt_layout)
         
         # Connect button
         button_layout = QHBoxLayout()
@@ -132,11 +137,11 @@ class BallStabilizerDashboard(QMainWindow):
         self.port_combo.setVisible(is_serial)
         self.refresh_btn.setVisible(is_serial)
         
-        # Show/hide WiFi widgets
-        self.esp32_ip_label.setVisible(not is_serial)
-        self.ip_input.setVisible(not is_serial)
-        self.port_label.setVisible(not is_serial)
-        self.port_input.setVisible(not is_serial)
+        # Show/hide MQTT widgets
+        self.broker_label.setVisible(not is_serial)
+        self.broker_input.setVisible(not is_serial)
+        self.mqtt_port_label.setVisible(not is_serial)
+        self.mqtt_port_input.setVisible(not is_serial)
     
     def create_info_group(self):
         """Create data info group."""
@@ -151,6 +156,42 @@ class BallStabilizerDashboard(QMainWindow):
         
         self.log_status_label = QLabel("Logging: Off")
         layout.addWidget(self.log_status_label)
+        
+        layout.addStretch()
+        
+        group.setLayout(layout)
+        return group
+    
+    def create_pid_control_group(self):
+        """Create PID control group."""
+        group = QGroupBox("PID Control")
+        layout = QHBoxLayout()
+        
+        # Kp input
+        layout.addWidget(QLabel("Kp:"))
+        self.kp_input = QLineEdit()
+        self.kp_input.setText("20.0")
+        self.kp_input.setMaximumWidth(80)
+        layout.addWidget(self.kp_input)
+        
+        # Ki input
+        layout.addWidget(QLabel("Ki:"))
+        self.ki_input = QLineEdit()
+        self.ki_input.setText("10.0")
+        self.ki_input.setMaximumWidth(80)
+        layout.addWidget(self.ki_input)
+        
+        # Kd input
+        layout.addWidget(QLabel("Kd:"))
+        self.kd_input = QLineEdit()
+        self.kd_input.setText("2.0")
+        self.kd_input.setMaximumWidth(80)
+        layout.addWidget(self.kd_input)
+        
+        # Send button
+        self.send_pid_btn = QPushButton("Send PID to ESP32")
+        self.send_pid_btn.clicked.connect(self.send_pid_values)
+        layout.addWidget(self.send_pid_btn)
         
         layout.addStretch()
         
@@ -198,12 +239,12 @@ class BallStabilizerDashboard(QMainWindow):
                 return
             success = self.data_manager.connect_serial(port)
         
-        elif mode == 1:  # WiFi
-            ip = self.ip_input.text().strip()
-            port_str = self.port_input.text().strip()
+        elif mode == 1:  # MQTT
+            broker = self.broker_input.text().strip()
+            port_str = self.mqtt_port_input.text().strip()
             
-            if not ip:
-                QMessageBox.warning(self, "Error", "Please enter ESP32 IP address")
+            if not broker:
+                QMessageBox.warning(self, "Error", "Please enter MQTT broker address")
                 return
             
             try:
@@ -212,7 +253,7 @@ class BallStabilizerDashboard(QMainWindow):
                 QMessageBox.warning(self, "Error", "Invalid port number")
                 return
             
-            success = self.data_manager.connect_wifi(ip, port)
+            success = self.data_manager.connect_mqtt(broker, port)
         
         if success:
             self.connect_btn.setText("Disconnect")
@@ -247,6 +288,27 @@ class BallStabilizerDashboard(QMainWindow):
         self.data_count = 0
         self.data_count_label.setText("Data Count: 0")
     
+    def send_pid_values(self):
+        """Send PID values to ESP32."""
+        if not self.data_manager.is_connected():
+            QMessageBox.warning(self, "Error", "Not connected to ESP32")
+            return
+        
+        try:
+            kp = float(self.kp_input.text())
+            ki = float(self.ki_input.text())
+            kd = float(self.kd_input.text())
+            
+            success = self.data_manager.send_pid_values(kp, ki, kd)
+            
+            if success:
+                QMessageBox.information(self, "Success", 
+                                      f"PID values sent to ESP32:\nKp={kp}, Ki={ki}, Kd={kd}")
+            else:
+                QMessageBox.warning(self, "Error", "Failed to send PID values")
+        except ValueError:
+            QMessageBox.warning(self, "Error", "Invalid PID values. Please enter numbers.")
+    
     def update_data(self):
         """Update data dari data manager."""
         if not self.data_manager.is_connected():
@@ -262,7 +324,7 @@ class BallStabilizerDashboard(QMainWindow):
         """Update status labels."""
         if self.data_manager.is_connected():
             mode = self.connection_mode_group.checkedId()
-            mode_text = ["Serial", "WiFi"][mode]
+            mode_text = ["Serial", "MQTT"][mode]
             self.status_label.setText(f"Status: Connected ({mode_text})")
         else:
             self.status_label.setText("Status: Disconnected")

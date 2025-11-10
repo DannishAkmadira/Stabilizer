@@ -4,72 +4,126 @@
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include <ESP32Servo.h>
+#include <PubSubClient.h>
 
-// WiFi TCP Server
-WiFiServer server(8888);  // Server pada port 8888
-WiFiClient client;
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
 
-// Create an instance of the MPU6050 sensor
+const char* mqtt_server = "broker.hivemq.com";
+const int mqtt_port = 1883;
+const char* mqtt_topic = "gimbal/stabilizer";
+const char* mqtt_topic_cmd = "gimbal/command";
+
+unsigned long lastMqttPublish = 0;
+const unsigned long mqttPublishInterval = 50;
+
 Adafruit_MPU6050 mpu;
+Servo servoRoll;
 
-// Servo instance for 1-axis gimbal
-Servo servoRoll;  // Servo untuk stabilisasi ROLL (miring kiri-kanan)
-
-// Servo pin
-const int SERVO_ROLL_PIN = 18;  // GPIO 18 for Roll servo
-
-// Servo center position (90 degrees = horizontal/stable)
+const int SERVO_ROLL_PIN = 18;
 int servoRollPos = 90;
 
-// PID control variables for Roll axis
 float angleRoll = 0;
-float targetAngleRoll = 0;  // Target angle (horizontal/stable = 0)
+float targetAngleRoll = 0;
 float errorRoll = 0;
 float lastErrorRoll = 0;
 float integralRoll = 0;
 float derivativeRoll = 0;
 
-// PID constants (tune these values for better performance)
-float Kp = 5.0;   // Proportional gain - untuk respon lebih agresif
-float Ki = 1.0;  // Integral gain - menghilangkan steady-state error
-float Kd = 0.01;   // Derivative gain - mengurangi overshoot
+float Kp = 5.0;
+float Ki = 0.5;
+float Kd = 0.3;
 
-// Timing variables
 unsigned long lastTime = 0;
-float dt = 0.01;  // Time step (10ms)
-
-// Complementary filter constant
+float dt = 0.01;
 float alpha = 0.96;
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String message = "";
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  
+  Serial.print("MQTT [");
+  Serial.print(topic);
+  Serial.print("]: ");
+  Serial.println(message);
+  
+  if (message.startsWith("PID:")) {
+    String pidValues = message.substring(4);
+    int firstComma = pidValues.indexOf(',');
+    int secondComma = pidValues.indexOf(',', firstComma + 1);
+    
+    if (firstComma > 0 && secondComma > firstComma) {
+      Kp = pidValues.substring(0, firstComma).toFloat();
+      Ki = pidValues.substring(firstComma + 1, secondComma).toFloat();
+      Kd = pidValues.substring(secondComma + 1).toFloat();
+      integralRoll = 0;
+      
+      Serial.print("PID Updated: Kp=");
+      Serial.print(Kp);
+      Serial.print(", Ki=");
+      Serial.print(Ki);
+      Serial.print(", Kd=");
+      Serial.println(Kd);
+    }
+  }
+  else if (message.startsWith("TARGET:")) {
+    targetAngleRoll = message.substring(7).toFloat();
+    Serial.print("Target angle set to: ");
+    Serial.println(targetAngleRoll);
+  }
+}
+
+void reconnectMQTT() {
+  while (!mqttClient.connected()) {
+    Serial.print("Connecting to MQTT broker...");
+    
+    String clientId = "Gimbal-" + String(random(0xffff), HEX);
+    
+    if (mqttClient.connect(clientId.c_str())) {
+      Serial.println("connected!");
+      mqttClient.subscribe(mqtt_topic_cmd);
+      Serial.print("Subscribed to: ");
+      Serial.println(mqtt_topic_cmd);
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" retrying in 5s...");
+      delay(5000);
+    }
+  }
+}
 
 void setup() {
   Serial.begin(115200);
   
-  // Initialize WiFiManager
   WiFiManager wifiManager;
-  
-  // Attempt to connect to a saved WiFi network
-  // If connection fails, it starts an access point with the name "GimbalAP"
   if (!wifiManager.autoConnect("GimbalAP")) {
     Serial.println("Failed to connect and hit timeout");
-    // Restart the ESP32
     ESP.restart();
   }
   
-  // If successfully connected to WiFi
   Serial.println("");
   Serial.println("WiFi connected!");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
   
-  // Start TCP Server
-  server.begin();
-  Serial.println("TCP Server started on port 8888");
-  Serial.println("Connect your laptop to the same WiFi network");
-  Serial.print("Use IP: ");
-  Serial.print(WiFi.localIP());
-  Serial.println(":8888");
+  mqttClient.setServer(mqtt_server, mqtt_port);
+  mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(512);
   
-  // Initialize the MPU6050 sensor
+  Serial.println("\n=== MQTT Configuration ===");
+  Serial.print("Broker: ");
+  Serial.print(mqtt_server);
+  Serial.print(":");
+  Serial.println(mqtt_port);
+  Serial.print("Publishing to: ");
+  Serial.println(mqtt_topic);
+  Serial.print("Listening on: ");
+  Serial.println(mqtt_topic_cmd);
+  Serial.println("=========================\n");
+  
   if (!mpu.begin()) {
     Serial.println("Failed to find MPU6050 chip");
     while (1) {
@@ -78,20 +132,13 @@ void setup() {
   }
   Serial.println("MPU6050 Found!");
   
-  // Set accelerometer range
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-  // Set gyroscope range
   mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  // Set filter bandwidth
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
   
-  // Initialize servo
   ESP32PWM::allocateTimer(0);
-  servoRoll.setPeriodHertz(50);    // Standard 50Hz servo
-  
-  servoRoll.attach(SERVO_ROLL_PIN, 500, 2400);  // Attach servo with min/max pulse width
-  
-  // Set servo to center position
+  servoRoll.setPeriodHertz(50);
+  servoRoll.attach(SERVO_ROLL_PIN, 500, 2400);
   servoRoll.write(servoRollPos);
   
   Serial.println("Gimbal Stabilizer ROLL-Axis Initialized!");
@@ -102,91 +149,112 @@ void setup() {
 }
 
 void loop() {
-  // Check for new WiFi client connections
-  if (!client.connected()) {
-    client = server.available();
-    if (client) {
-      Serial.println("New client connected via WiFi!");
+  if (!mqttClient.connected()) {
+    reconnectMQTT();
+  }
+  mqttClient.loop();
+  
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    
+    if (command.startsWith("PID:")) {
+      String pidValues = command.substring(4);
+      int firstComma = pidValues.indexOf(',');
+      int secondComma = pidValues.indexOf(',', firstComma + 1);
+      
+      if (firstComma > 0 && secondComma > firstComma) {
+        Kp = pidValues.substring(0, firstComma).toFloat();
+        Ki = pidValues.substring(firstComma + 1, secondComma).toFloat();
+        Kd = pidValues.substring(secondComma + 1).toFloat();
+        integralRoll = 0;
+        
+        Serial.print("PID Updated via Serial - Kp: ");
+        Serial.print(Kp, 2);
+        Serial.print(", Ki: ");
+        Serial.print(Ki, 2);
+        Serial.print(", Kd: ");
+        Serial.println(Kd, 2);
+      }
     }
   }
   
-  // Get new sensor events with the readings
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
   
-  // Calculate time difference
   unsigned long currentTime = millis();
   dt = (currentTime - lastTime) / 1000.0;
   lastTime = currentTime;
   
-  // Calculate ROLL angle from accelerometer (in degrees)
-  // MPU6050 menghadap depan, Roll (miring kiri-kanan) ada di sumbu Y
-  // Roll angle dihitung dari X dan Z acceleration
   float accelAngleRoll = atan2(a.acceleration.x, a.acceleration.z) * 180.0 / PI;
-  
-  // Integrate gyroscope data for Roll axis (convert rad/s to deg/s and integrate)
-  // Roll rotation ada di sumbu Y, jadi gunakan gyro.y
   float gyroRateRoll = g.gyro.y * 180.0 / PI;
-  
-  // Complementary filter: combine accelerometer and gyroscope data for Roll
   angleRoll = alpha * (angleRoll + gyroRateRoll * dt) + (1 - alpha) * accelAngleRoll;
   
-  // ===== PID STABILIZATION FOR ROLL AXIS (sumbu Y) =====
+  errorRoll = angleRoll - targetAngleRoll;
   
-  // Calculate error (DIBALIK untuk kompensasi yang benar)
-  // Ketika miring kanan (+), error positif → servo ke kanan (180°)
-  // Ketika miring kiri (-), error negatif → servo ke kiri (0°)
-  errorRoll = angleRoll - targetAngleRoll;  // DIBALIK: angle - target (bukan target - angle)
-  
-  // Integral term with anti-windup
   integralRoll += errorRoll * dt;
-  integralRoll = constrain(integralRoll, -20, 20);  // Anti-windup limits
+  integralRoll = constrain(integralRoll, -25, 25);
   
-  // Derivative term
-  derivativeRoll = (errorRoll - lastErrorRoll) / dt;
-  
-  // PID output calculation
-  float outputRoll = Kp * errorRoll + Ki * integralRoll + Kd * derivativeRoll;
-  
-  // Store current error for next iteration
-  lastErrorRoll = errorRoll;
-  
-  // Convert PID output to servo position
-  // Ketika miring KANAN (angle positif) → servo ke KANAN (menuju 180°)
-  // Ketika miring KIRI (angle negatif) → servo ke KIRI (menuju 0°)
-  servoRollPos = 90 + constrain(outputRoll, -90, 90);  // Stabil=90°, Kanan=180°, Kiri=0°
-  
-  // Write to servo
-  servoRoll.write(servoRollPos);
-  
-  // Print debug information untuk monitoring
-  Serial.print("Roll Angle (sumbu Y): ");
-  Serial.print(angleRoll, 2);
-  Serial.print("° | Error: ");
-  Serial.print(errorRoll, 2);
-  Serial.print("° | Servo: ");
-  Serial.print(servoRollPos);
-  Serial.print("° | Gyro Y: ");
-  Serial.print(gyroRateRoll, 2);
-  Serial.println(" deg/s");
-  
-  // Kirim data dalam format untuk dashboard
-  // Format: DATA:ROLL_ANGLE,GYRO_Y_RATE,SERVO_POS
-  String data = "DATA:";
-  data += String(angleRoll, 2);  // Roll angle (miring kiri-kanan pada sumbu Y)
-  data += ",";
-  data += String(gyroRateRoll, 2);  // Gyro rate dalam deg/s
-  data += ",";
-  data += String(servoRollPos);  // Posisi servo
-  data += "\n";
-  
-  // Kirim ke Serial Monitor
-  Serial.print(data);
-  
-  // Kirim ke WiFi client jika ada yang terhubung
-  if (client && client.connected()) {
-    client.print(data);
+  if ((servoRollPos >= 175 && errorRoll > 0) || (servoRollPos <= 5 && errorRoll < 0)) {
+    integralRoll *= 0.5;
   }
   
-  delay(10);  // 100Hz update rate untuk stabilisasi yang smooth
+  float rawDerivative = (errorRoll - lastErrorRoll) / dt;
+  derivativeRoll = 0.9 * derivativeRoll + 0.1 * rawDerivative;
+  
+  float outputRoll = Kp * errorRoll + Ki * integralRoll + Kd * derivativeRoll;
+  lastErrorRoll = errorRoll;
+  
+  float limitedOutput = constrain(outputRoll, -80, 80);
+  
+  if (abs(errorRoll) < 0.5) {
+    limitedOutput *= 0.3;
+  }
+  
+  int newServoPos = 90 + limitedOutput;
+  newServoPos = constrain(newServoPos, 10, 170);
+  
+  if (abs(newServoPos - servoRollPos) > 1 || abs(errorRoll) > 2.0) {
+    servoRollPos = newServoPos;
+    servoRoll.write(servoRollPos);
+  }
+  
+  Serial.print("Roll: ");
+  Serial.print(angleRoll, 2);
+  Serial.print("° | Err: ");
+  Serial.print(errorRoll, 2);
+  Serial.print("° | PID(");
+  Serial.print(outputRoll, 1);
+  Serial.print(") | Servo: ");
+  Serial.print(servoRollPos);
+  Serial.print("° | I: ");
+  Serial.print(integralRoll, 1);
+  Serial.print(" | Gyro: ");
+  Serial.print(gyroRateRoll, 1);
+  Serial.println(" °/s");
+  
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastMqttPublish >= mqttPublishInterval) {
+    lastMqttPublish = currentMillis;
+    
+    String jsonData = "{\"r\":";
+    jsonData += String(angleRoll, 2);
+    jsonData += ",\"g\":";
+    jsonData += String(gyroRateRoll, 2);
+    jsonData += ",\"s\":";
+    jsonData += String(servoRollPos);
+    jsonData += ",\"e\":";
+    jsonData += String(errorRoll, 2);
+    jsonData += ",\"i\":";
+    jsonData += String(integralRoll, 1);
+    jsonData += "}";
+    
+    if (mqttClient.connected()) {
+      mqttClient.publish(mqtt_topic, jsonData.c_str());
+    }
+    
+    Serial.println(jsonData);
+  }
+  
+  delay(20);
 }
