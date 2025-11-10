@@ -126,20 +126,6 @@ class BallStabilizerDashboard(QMainWindow):
         imu_group.setLayout(imu_layout)
         main_layout.addWidget(imu_group)
 
-        # PID Control
-        pid_group = QGroupBox("PID Control")
-        pid_layout = QGridLayout()
-        self.kp_input = QLineEdit("1.0")
-        self.ki_input = QLineEdit("0.5")
-        self.kd_input = QLineEdit("0.1")
-        pid_layout.addWidget(QLabel("Kp:"), 0, 0)
-        pid_layout.addWidget(self.kp_input, 0, 1)
-        pid_layout.addWidget(QLabel("Ki:"), 1, 0)
-        pid_layout.addWidget(self.ki_input, 1, 1)
-        pid_layout.addWidget(QLabel("Kd:"), 2, 0)
-        pid_layout.addWidget(self.kd_input, 2, 1)
-        pid_group.setLayout(pid_layout)
-        main_layout.addWidget(pid_group)
 
         # Tombol kontrol
         btn_layout = QHBoxLayout()
