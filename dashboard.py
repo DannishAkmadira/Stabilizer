@@ -29,13 +29,13 @@ class BallStabilizerDashboard(QMainWindow):
         self.csv_filename = "imu_log.csv"
         
         # Connection variables
-        self.connection_mode = "serial"  # "serial" or "wifi"
+        self.connection_mode = "serial"  
         self.serial_port = None
         self.serial_connected = False
         self.wifi_socket = None
         self.wifi_connected = False
-        self.wifi_buffer = ""  # Buffer untuk data WiFi yang belum lengkap
-        self.data_counter = 0  # Counter untuk debugging
+        self.wifi_buffer = "" 
+        self.data_counter = 0  
 
         # Hapus file log lama saat program dijalankan
         if os.path.exists(self.csv_filename):
@@ -98,7 +98,7 @@ class BallStabilizerDashboard(QMainWindow):
         wifi_layout.addWidget(self.btn_wifi_connect)
         wifi_layout.addWidget(self.btn_wifi_disconnect)
         self.wifi_group.setLayout(wifi_layout)
-        self.wifi_group.setVisible(False)  # Hidden by default
+        self.wifi_group.setVisible(False)  
         main_layout.addWidget(self.wifi_group)
 
         # Status
@@ -148,8 +148,8 @@ class BallStabilizerDashboard(QMainWindow):
         # Grafik (2 subplot: Roll Angle dan Gyro Rate)
         self.figure = Figure(figsize=(10, 6))
         self.canvas = FigureCanvas(self.figure)
-        self.ax_roll = self.figure.add_subplot(211)  # Top plot
-        self.ax_gyro = self.figure.add_subplot(212)  # Bottom plot
+        self.ax_roll = self.figure.add_subplot(211)  
+        self.ax_gyro = self.figure.add_subplot(212)    
         self.init_plot()
         main_layout.addWidget(self.canvas)
 
@@ -190,8 +190,6 @@ class BallStabilizerDashboard(QMainWindow):
     def start_system(self):
         if not self.running:
             self.running = True
-            # Update lebih cepat untuk WiFi/Serial real-time (100ms = 10Hz)
-            # Lebih lambat dari ESP32 (10ms) tapi cukup untuk plotting smooth
             self.timer.start(100)  # update tiap 0.1 detik (10Hz)
             self.label_status.setText("Status: RUNNING")
             self.label_status.setStyleSheet("font-size: 16px; font-weight: bold; color: green;")
@@ -272,7 +270,7 @@ class BallStabilizerDashboard(QMainWindow):
         port_name = port_text.split(" - ")[0]
         try:
             self.serial_port = serial.Serial(port_name, 115200, timeout=1)
-            time.sleep(2)  # Wait for Arduino/ESP32 to reset
+            time.sleep(2)  
             self.serial_connected = True
             self.btn_serial_connect.setEnabled(False)
             self.btn_serial_disconnect.setEnabled(True)
@@ -304,11 +302,11 @@ class BallStabilizerDashboard(QMainWindow):
         
         try:
             self.wifi_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.wifi_socket.settimeout(5)  # 5 second timeout for connection
+            self.wifi_socket.settimeout(5) 
             print(f"[INFO] Connecting to {ip_address}:{port}...")
             self.wifi_socket.connect((ip_address, port))
-            self.wifi_socket.settimeout(0.1)  # 100ms timeout for reading (non-blocking)
-            self.wifi_buffer = ""  # Reset buffer
+            self.wifi_socket.settimeout(0.1)  
+            self.wifi_buffer = ""  
             self.wifi_connected = True
             self.btn_wifi_connect.setEnabled(False)
             self.btn_wifi_disconnect.setEnabled(True)
@@ -349,7 +347,7 @@ class BallStabilizerDashboard(QMainWindow):
             if self.serial_port.in_waiting > 0:
                 line = self.serial_port.readline().decode('utf-8').strip()
                 if line:
-                    print(f"[SERIAL RAW] {line}")  # Debug: tampilkan data mentah
+                    print(f"[SERIAL RAW] {line}")  
                     return self.parse_data_line(line)
         except Exception as e:
             print(f"[ERROR] Reading serial data: {str(e)}")
@@ -379,7 +377,7 @@ class BallStabilizerDashboard(QMainWindow):
                         if result[0] is not None:
                             return result
         except socket.timeout:
-            pass  # No data available, normal behavior
+            pass  
         except Exception as e:
             print(f"[ERROR] Reading WiFi data: {str(e)}")
             self.wifi_connected = False
@@ -392,7 +390,6 @@ class BallStabilizerDashboard(QMainWindow):
     # Parse data line from ESP32
     def parse_data_line(self, line):
         try:
-            # Parse format baru: "DATA:roll,gyro_rate,servo_pos"
             if line.startswith("DATA:"):
                 data = line.replace("DATA:", "").split(",")
                 if len(data) >= 3:
@@ -401,16 +398,14 @@ class BallStabilizerDashboard(QMainWindow):
                     servo_pos = int(data[2])
                     return roll, gyro_rate, servo_pos
             
-            # Fallback: Parse format lama "Roll Angle: 10.5° | Error: ..."
             elif "Roll Angle:" in line:
                 parts = line.split("|")
                 roll = float(parts[0].split(":")[1].replace("°", "").strip())
-                # Extract gyro rate if available
                 gyro_rate = 0
                 for part in parts:
                     if "GyroRate:" in part:
                         gyro_rate = float(part.split(":")[1].replace("deg/s", "").strip())
-                return roll, gyro_rate, 90  # Default servo 90
+                return roll, gyro_rate, 90  
         except Exception as e:
             print(f"[ERROR] Parsing data: {str(e)}")
         
@@ -435,13 +430,11 @@ class BallStabilizerDashboard(QMainWindow):
                 self.data_counter += 1
                 print(f"[WIFI DATA #{self.data_counter}] Roll: {roll:.2f}°, Gyro: {gyro_rate:.2f} deg/s, Servo: {servo_pos}°")
         else:
-            # Gunakan data simulasi jika tidak terkoneksi
             roll = random.uniform(-30, 30)
             gyro_rate = random.uniform(-50, 50)
             servo_pos = 90
             self.data_counter += 1
 
-        # Jika tidak ada data valid, skip update kali ini
         if roll is None or gyro_rate is None or servo_pos is None:
             return
 
