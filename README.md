@@ -52,14 +52,40 @@ Koneksi wireless melalui MQTT broker.
 
 ## Cara Penggunaan
 
+### Hardware Wiring
+
+**MPU6050 (I2C):**
+- SDA → GPIO 21
+- SCL → GPIO 22
+- VCC → 3.3V
+- GND → GND
+
+**Servo Motor:**
+- Signal → GPIO 19
+- VCC → 5V
+- GND → GND
+
+**OLED SSD1306 (SPI) - Optional:**
+- MOSI → GPIO 23
+- CLK → GPIO 18
+- DC → GPIO 16
+- RST → GPIO 17
+- CS → GPIO 5
+- VCC → 3.3V
+- GND → GND
+
+See [OLED_WIRING.md](OLED_WIRING.md) for detailed wiring diagram.
+
 ### Setup ESP32
 
-1. Upload firmware ke ESP32 menggunakan PlatformIO
-2. ESP32 akan membuat Access Point "GimbalAP" saat pertama kali
-3. Hubungkan ke WiFi "GimbalAP"
-4. Browser akan terbuka untuk konfigurasi WiFi (atau buka 192.168.4.1)
-5. Pilih WiFi dan masukkan password
-6. ESP32 akan restart dan connect ke WiFi
+1. Wire all components according to pinout above
+2. Upload firmware ke ESP32 menggunakan PlatformIO
+3. ESP32 akan membuat Access Point "GimbalAP" saat pertama kali
+4. Hubungkan ke WiFi "GimbalAP"
+5. Browser akan terbuka untuk konfigurasi WiFi (atau buka 192.168.4.1)
+6. Pilih WiFi dan masukkan password
+7. ESP32 akan restart dan connect ke WiFi
+8. OLED akan menampilkan status WiFi dan MQTT
 
 ### Install Dependencies
 
@@ -107,6 +133,7 @@ DATA:roll,gyro_rate,servo_pos
 - PID control tuning dari aplikasi
 - Data logging ke CSV
 - Dual mode connection (Serial & MQTT)
+- **OLED Display**: Real-time status on device (WiFi, MQTT, Roll, Error, Servo, PID values)
 
 ## PID Tuning
 
@@ -122,12 +149,29 @@ Tips:
 - Ki: Tingkatkan untuk melawan beban
 - Kd: Tingkatkan untuk damping lebih baik
 
+## Hardware Components
+
+- ESP32 Development Board
+- MPU6050 IMU Sensor (I2C)
+- Servo Motor (for gimbal control)
+- SSD1306 OLED Display 128x64 (SPI) - Optional
+- Power Supply (5V for servo, 3.3V for ESP32)
+
 ## Dependencies
 
+### Python (Dashboard)
 - PyQt5
 - matplotlib
 - pyserial
 - paho-mqtt
+
+### ESP32 Firmware
+- WiFiManager
+- Adafruit MPU6050
+- Adafruit SSD1306 (OLED)
+- Adafruit GFX Library
+- ESP32Servo
+- PubSubClient (MQTT)
 
 ## Troubleshooting
 
