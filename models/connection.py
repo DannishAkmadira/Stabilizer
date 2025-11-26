@@ -35,7 +35,7 @@ class IConnection(ABC):
 
 class SerialConnection(IConnection):
     
-    def __init__(self, port: str, baudrate: int = 115200):
+    def __init__(self, port: str, baudrate: int = 921600):
         self.port = port
         self.baudrate = baudrate
         self.serial = None

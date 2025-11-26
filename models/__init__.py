@@ -1,5 +1,3 @@
-"""Models package for Ball Stabilizer Dashboard."""
-
 from .imu_data import IMUData
 from .connection import IConnection, SerialConnection, WiFiConnection, MQTTConnection
 from .data_processor import DataParser, DataSimulator

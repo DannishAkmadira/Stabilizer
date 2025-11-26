@@ -4,7 +4,6 @@ from views import BallStabilizerDashboard
 
 
 def main():
-    """Main function to run the application."""
     app = QApplication(sys.argv)
     window = BallStabilizerDashboard()
     window.show()

@@ -18,9 +18,6 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT,
   OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
-bool enableWiFi = false;
-bool enableMQTT = false;
-
 unsigned long lastDataPublish = 0;
 const unsigned long dataPublishInterval = 20;
 
@@ -30,6 +27,10 @@ Servo servoRoll;
 const int SERVO_ROLL_PIN = 19;
 const int RESET_WIFI_PIN = 0;
 int servoRollPos = 90;
+
+const int SERVO_MIN = 0;      
+const int SERVO_MAX = 180;    
+const int SERVO_CENTER = 90;  
 
 unsigned long lastOledUpdate = 0;
 const unsigned long oledUpdateInterval = 100;
@@ -41,9 +42,9 @@ float lastErrorRoll = 0;
 float integralRoll = 0;
 float derivativeRoll = 0;
 
-float Kp = 7.0;
-float Ki = 0.5;
-float Kd = 0;
+float Kp = 1.4;
+float Ki = 0.07;
+float Kd = 0.001;
 
 unsigned long lastTime = 0;
 float dt = 0.01;
@@ -55,7 +56,7 @@ void updateOLED() {
   display.setTextColor(SSD1306_WHITE);
   
   display.setCursor(0, 0);
-  display.println(F("== GIMBAL SERIAL =="));
+  display.println(F("Stabilizer"));
   
   display.setCursor(0, 10);
   display.println(F("Mode: USART"));
@@ -91,11 +92,7 @@ void setup() {
   Serial.begin(921600);
   delay(100);
   
-  Serial.println("\n\n=================================");
-  Serial.println("  GIMBAL STABILIZER - SERIAL MODE");
-  Serial.println("  Baud Rate: 921600");
-  Serial.println("  Update Rate: 50Hz (20ms)");
-  Serial.println("=================================\n");
+  Serial.println("  Platform Stabilizer");
   
   if (!mpu.begin()) {
     Serial.println("Failed to find MPU6050 chip");
@@ -110,14 +107,14 @@ void setup() {
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
   
   if(!display.begin(SSD1306_SWITCHCAPVCC)) {
-    Serial.println(F("SSD1306 allocation failed"));
+    Serial.println(F("SSD1306 failed"));
   } else {
-    Serial.println("OLED Display Initialized!");
+    Serial.println("OLED Display On");
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
-    display.println(F("Gimbal Stabilizer"));
+    display.println(F("Stabilizer"));
     display.println(F("Initializing..."));
     display.display();
     delay(1000);
@@ -128,14 +125,14 @@ void setup() {
   servoRoll.attach(SERVO_ROLL_PIN, 500, 2400);
   servoRoll.write(servoRollPos);
   
-  Serial.println("Gimbal Stabilizer ROLL-Axis Initialized!");
+  Serial.println("Turned On");
   Serial.println("Calibrating... Keep the gimbal level and stable");
   delay(500);
   
   lastTime = millis();
   
-  Serial.println("\n🚀 === SYSTEM READY - GIMBAL RUNNING ===");
-  Serial.println("⚡ Serial/USART mode - Data streaming enabled!\n");
+  Serial.println("\n");
+  Serial.println("Serial/USART mode\n");
 }
 
 void loop() {
@@ -168,7 +165,7 @@ void loop() {
   
   sensors_event_t a, g, temp;
   if (!mpu.getEvent(&a, &g, &temp)) {
-    Serial.println("⚠️ MPU6050 read error!");
+    Serial.println("MPU6050 read error!");
     delay(10);
     return;
   }
@@ -185,10 +182,10 @@ void loop() {
   errorRoll = angleRoll - targetAngleRoll;
   
   integralRoll += errorRoll * dt;
-  integralRoll = constrain(integralRoll, -25, 25);
+  integralRoll = constrain(integralRoll, -40, 40);  
   
-  if ((servoRollPos >= 175 && errorRoll > 0) || (servoRollPos <= 5 && errorRoll < 0)) {
-    integralRoll *= 0.5;
+  if ((servoRollPos >= 178 && errorRoll > 0) || (servoRollPos <= 2 && errorRoll < 0)) {
+    integralRoll *= 0.5; 
   }
   
   float rawDerivative = (errorRoll - lastErrorRoll) / dt;
@@ -197,19 +194,13 @@ void loop() {
   float outputRoll = Kp * errorRoll + Ki * integralRoll + Kd * derivativeRoll;
   lastErrorRoll = errorRoll;
   
-  float limitedOutput = constrain(outputRoll, -80, 80);
+  float limitedOutput = constrain(outputRoll, -90, 90);
   
-  if (abs(errorRoll) < 0.5) {
-    limitedOutput *= 0.3;
-  }
+  int newServoPos = SERVO_CENTER + limitedOutput;
+  newServoPos = constrain(newServoPos, SERVO_MIN, SERVO_MAX);
   
-  int newServoPos = 90 + limitedOutput;
-  newServoPos = constrain(newServoPos, 10, 170);
-  
-  if (abs(newServoPos - servoRollPos) > 1 || abs(errorRoll) > 2.0) {
-    servoRollPos = newServoPos;
-    servoRoll.write(servoRollPos);
-  }
+  servoRollPos = newServoPos;
+  servoRoll.write(servoRollPos);
   
   unsigned long currentMillis = millis();
   if (currentMillis - lastDataPublish >= dataPublishInterval) {
@@ -232,6 +223,4 @@ void loop() {
     lastOledUpdate = currentMillis;
     updateOLED();
   }
-  
-  delay(10);
 }

@@ -1,5 +1,3 @@
-"""Main window UI for Ball Stabilizer Dashboard."""
-
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QComboBox,
@@ -12,7 +10,6 @@ from .plot_widget import PlotWidget
 
 
 class BallStabilizerDashboard(QMainWindow):
-    """Main window untuk Ball Stabilizer Dashboard."""
     
     def __init__(self):
         super().__init__()
@@ -20,49 +17,38 @@ class BallStabilizerDashboard(QMainWindow):
         self.data_count = 0
         self.init_ui()
         
-        # Setup timer untuk membaca data
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(100)  # Update setiap 100ms
+        self.timer.start(100)
     
     def init_ui(self):
-        """Setup UI components."""
         self.setWindowTitle('Ball Stabilizer Dashboard')
         self.setGeometry(100, 100, 1200, 800)
         
-        # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Main layout
         main_layout = QVBoxLayout(central_widget)
         
-        # Connection group
         connection_group = self.create_connection_group()
         main_layout.addWidget(connection_group)
         
-        # Data info group
         info_group = self.create_info_group()
         main_layout.addWidget(info_group)
         
-        # PID Control group
         pid_group = self.create_pid_control_group()
         main_layout.addWidget(pid_group)
         
-        # Plot widget
         self.plot_widget = PlotWidget(max_points=500)
         main_layout.addWidget(self.plot_widget)
         
-        # Control buttons
         control_layout = self.create_control_buttons()
         main_layout.addLayout(control_layout)
     
     def create_connection_group(self):
-        """Create connection settings group."""
         group = QGroupBox("Connection Settings")
         layout = QVBoxLayout()
         
-        # Connection mode selection
         mode_layout = QHBoxLayout()
         self.connection_mode_group = QButtonGroup()
         
@@ -73,7 +59,6 @@ class BallStabilizerDashboard(QMainWindow):
         self.connection_mode_group.addButton(self.mqtt_radio, 1)
         self.serial_radio.setChecked(True)
         
-        # Connect radio buttons to slot
         self.serial_radio.toggled.connect(self.on_mode_changed)
         self.mqtt_radio.toggled.connect(self.on_mode_changed)
         
@@ -82,7 +67,6 @@ class BallStabilizerDashboard(QMainWindow):
         mode_layout.addStretch()
         layout.addLayout(mode_layout)
         
-        # Serial settings
         self.serial_layout = QHBoxLayout()
         self.serial_port_label = QLabel("Serial Port:")
         self.serial_layout.addWidget(self.serial_port_label)
@@ -96,7 +80,6 @@ class BallStabilizerDashboard(QMainWindow):
         self.serial_layout.addStretch()
         layout.addLayout(self.serial_layout)
         
-        # MQTT settings
         self.mqtt_layout = QHBoxLayout()
         self.broker_label = QLabel("MQTT Broker:")
         self.mqtt_layout.addWidget(self.broker_label)
@@ -114,7 +97,6 @@ class BallStabilizerDashboard(QMainWindow):
         self.mqtt_layout.addStretch()
         layout.addLayout(self.mqtt_layout)
         
-        # Connect button
         button_layout = QHBoxLayout()
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.clicked.connect(self.toggle_connection)
@@ -122,29 +104,24 @@ class BallStabilizerDashboard(QMainWindow):
         button_layout.addStretch()
         layout.addLayout(button_layout)
         
-        # Set initial visibility
         self.on_mode_changed()
         
         group.setLayout(layout)
         return group
     
     def on_mode_changed(self):
-        """Handle mode change to show/hide relevant input fields."""
         is_serial = self.serial_radio.isChecked()
         
-        # Show/hide serial widgets
         self.serial_port_label.setVisible(is_serial)
         self.port_combo.setVisible(is_serial)
         self.refresh_btn.setVisible(is_serial)
         
-        # Show/hide MQTT widgets
         self.broker_label.setVisible(not is_serial)
         self.broker_input.setVisible(not is_serial)
         self.mqtt_port_label.setVisible(not is_serial)
         self.mqtt_port_input.setVisible(not is_serial)
     
     def create_info_group(self):
-        """Create data info group."""
         group = QGroupBox("Data Info")
         layout = QHBoxLayout()
         
@@ -163,32 +140,27 @@ class BallStabilizerDashboard(QMainWindow):
         return group
     
     def create_pid_control_group(self):
-        """Create PID control group."""
         group = QGroupBox("PID Control")
         layout = QHBoxLayout()
         
-        # Kp input
         layout.addWidget(QLabel("Kp:"))
         self.kp_input = QLineEdit()
-        self.kp_input.setText("20.0")
+        self.kp_input.setText("7.0")
         self.kp_input.setMaximumWidth(80)
         layout.addWidget(self.kp_input)
         
-        # Ki input
         layout.addWidget(QLabel("Ki:"))
         self.ki_input = QLineEdit()
-        self.ki_input.setText("10.0")
+        self.ki_input.setText("0.5")
         self.ki_input.setMaximumWidth(80)
         layout.addWidget(self.ki_input)
         
-        # Kd input
         layout.addWidget(QLabel("Kd:"))
         self.kd_input = QLineEdit()
-        self.kd_input.setText("2.0")
+        self.kd_input.setText("0.0")
         self.kd_input.setMaximumWidth(80)
         layout.addWidget(self.kd_input)
         
-        # Send button
         self.send_pid_btn = QPushButton("Send PID to ESP32")
         self.send_pid_btn.clicked.connect(self.send_pid_values)
         layout.addWidget(self.send_pid_btn)
@@ -199,7 +171,6 @@ class BallStabilizerDashboard(QMainWindow):
         return group
     
     def create_control_buttons(self):
-        """Create control buttons."""
         layout = QHBoxLayout()
         
         self.log_btn = QPushButton("Start Logging")
@@ -215,31 +186,28 @@ class BallStabilizerDashboard(QMainWindow):
         return layout
     
     def refresh_ports(self):
-        """Refresh daftar serial ports."""
         self.port_combo.clear()
         ports = SerialConnection.list_ports()
         self.port_combo.addItems(ports)
     
     def toggle_connection(self):
-        """Toggle connect/disconnect."""
         if self.data_manager.is_connected():
             self.disconnect()
         else:
             self.connect()
     
     def connect(self):
-        """Connect ke data source."""
         mode = self.connection_mode_group.checkedId()
         success = False
         
-        if mode == 0:  # Serial
+        if mode == 0:
             port = self.port_combo.currentText()
             if not port:
                 QMessageBox.warning(self, "Error", "Please select a serial port")
                 return
             success = self.data_manager.connect_serial(port)
         
-        elif mode == 1:  # MQTT
+        elif mode == 1:
             broker = self.broker_input.text().strip()
             port_str = self.mqtt_port_input.text().strip()
             
@@ -263,13 +231,11 @@ class BallStabilizerDashboard(QMainWindow):
             QMessageBox.warning(self, "Error", "Failed to connect")
     
     def disconnect(self):
-        """Disconnect dari data source."""
         self.data_manager.disconnect()
         self.connect_btn.setText("Connect")
         self.update_status()
     
     def toggle_logging(self):
-        """Toggle logging on/off."""
         if self.data_manager.is_logging():
             self.data_manager.stop_logging()
             self.log_btn.setText("Start Logging")
@@ -283,13 +249,11 @@ class BallStabilizerDashboard(QMainWindow):
         self.update_status()
     
     def clear_plot(self):
-        """Clear plot data."""
         self.plot_widget.clear_plot()
         self.data_count = 0
         self.data_count_label.setText("Data Count: 0")
     
     def send_pid_values(self):
-        """Send PID values to ESP32."""
         if not self.data_manager.is_connected():
             QMessageBox.warning(self, "Error", "Not connected to ESP32")
             return
@@ -310,7 +274,6 @@ class BallStabilizerDashboard(QMainWindow):
             QMessageBox.warning(self, "Error", "Invalid PID values. Please enter numbers.")
     
     def update_data(self):
-        """Update data dari data manager."""
         if not self.data_manager.is_connected():
             return
         
@@ -321,7 +284,6 @@ class BallStabilizerDashboard(QMainWindow):
             self.data_count_label.setText(f"Data Count: {self.data_count}")
     
     def update_status(self):
-        """Update status labels."""
         if self.data_manager.is_connected():
             mode = self.connection_mode_group.checkedId()
             mode_text = ["Serial", "MQTT"][mode]
@@ -336,7 +298,6 @@ class BallStabilizerDashboard(QMainWindow):
             self.log_status_label.setText("Logging: Off")
     
     def closeEvent(self, event):
-        """Handle window close event."""
         if self.data_manager.is_connected():
             self.data_manager.disconnect()
         event.accept()
